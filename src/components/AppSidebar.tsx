@@ -30,7 +30,7 @@ export function AppSidebar() {
       <div className="relative flex items-center gap-3 px-4 py-6">
         {/* Glow behind logo */}
         <div className="absolute left-4 top-6 h-10 w-10 rounded-xl bg-primary/30 blur-lg" />
-        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[hsl(15,90%,48%)] text-primary-foreground font-extrabold text-lg shadow-lg shadow-primary/25 shrink-0">
+        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[hsl(240,85%,50%)] text-primary-foreground font-extrabold text-lg shadow-lg shadow-primary/25 shrink-0">
           <Store className="h-5 w-5" />
         </div>
         {!collapsed && (
