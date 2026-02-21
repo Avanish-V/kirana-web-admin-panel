@@ -1,25 +1,15 @@
-import { useState } from "react";
-import { Plus, Search, Pencil, Trash2, Package } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useRef } from "react";
+import { Plus, Search, Pencil, Trash2, Package, ImagePlus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,6 +20,7 @@ interface Product {
   price: number;
   stock: number;
   unit: string;
+  image?: string;
 }
 
 const initialProducts: Product[] = [
@@ -53,7 +44,7 @@ function getStockBadge(stock: number) {
   return <Badge className="bg-success/15 text-success border-0 text-xs">In Stock</Badge>;
 }
 
-const emptyProduct = { name: "", category: "Grocery", price: 0, stock: 0, unit: "" };
+const emptyProduct = { name: "", category: "Grocery", price: 0, stock: 0, unit: "", image: "" };
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -62,6 +53,8 @@ export default function Products() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyProduct);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const filtered = products.filter((p) => {
@@ -70,15 +63,29 @@ export default function Products() {
     return matchSearch && matchCat;
   });
 
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setImagePreview(result);
+      setForm((prev) => ({ ...prev, image: result }));
+    };
+    reader.readAsDataURL(file);
+  }
+
   function openAdd() {
     setEditingProduct(null);
     setForm(emptyProduct);
+    setImagePreview(null);
     setDialogOpen(true);
   }
 
   function openEdit(product: Product) {
     setEditingProduct(product);
-    setForm({ name: product.name, category: product.category, price: product.price, stock: product.stock, unit: product.unit });
+    setForm({ name: product.name, category: product.category, price: product.price, stock: product.stock, unit: product.unit, image: product.image || "" });
+    setImagePreview(product.image || null);
     setDialogOpen(true);
   }
 
@@ -122,21 +129,12 @@ export default function Products() {
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <Input placeholder="Search products..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
+                {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -163,39 +161,33 @@ export default function Products() {
                   <tr key={product.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                          <Package className="h-4 w-4 text-primary" />
-                        </div>
+                        {product.image ? (
+                          <img src={product.image} alt={product.name} className="h-9 w-9 rounded-lg object-cover" />
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                            <Package className="h-4 w-4 text-primary" />
+                          </div>
+                        )}
                         <div>
                           <p className="font-medium">{product.name}</p>
                           <p className="text-xs text-muted-foreground">{product.unit}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="secondary" className="text-xs font-normal">{product.category}</Badge>
-                    </td>
+                    <td className="py-3 px-4"><Badge variant="secondary" className="text-xs font-normal">{product.category}</Badge></td>
                     <td className="py-3 px-4 font-medium">₹{product.price}</td>
                     <td className="py-3 px-4">{product.stock}</td>
                     <td className="py-3 px-4">{getStockBadge(product.stock)}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(product)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(product.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(product)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(product.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-muted-foreground">
-                      No products found
-                    </td>
-                  </tr>
+                  <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">No products found</td></tr>
                 )}
               </tbody>
             </table>
@@ -210,6 +202,29 @@ export default function Products() {
             <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <Label>Product Image</Label>
+              <div
+                className="flex items-center gap-4 cursor-pointer group"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Preview" className="h-20 w-20 rounded-xl object-cover border-2 border-primary/20 group-hover:border-primary/50 transition-colors" />
+                ) : (
+                  <div className="h-20 w-20 rounded-xl border-2 border-dashed border-muted-foreground/30 group-hover:border-primary/50 flex flex-col items-center justify-center transition-colors">
+                    <ImagePlus className="h-6 w-6 text-muted-foreground/50 group-hover:text-primary/70 transition-colors" />
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                    {imagePreview ? "Change image" : "Upload image"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG up to 5MB</p>
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label>Product Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Tata Salt" />
@@ -220,9 +235,7 @@ export default function Products() {
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {categories.filter((c) => c !== "All").map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
+                    {categories.filter((c) => c !== "All").map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -243,9 +256,7 @@ export default function Products() {
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
             <Button onClick={handleSave}>{editingProduct ? "Update" : "Add Product"}</Button>
           </DialogFooter>
         </DialogContent>
