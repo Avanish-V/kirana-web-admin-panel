@@ -238,23 +238,23 @@ export default function Orders() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Filters & Orders */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="text-base font-semibold">All Orders</CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search orders..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-9 w-[200px]"
+                  className="pl-9 h-9 w-full sm:w-[200px]"
                 />
               </div>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="w-full sm:w-[160px] h-9">
                   <SelectValue placeholder="Filter status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -270,68 +270,124 @@ export default function Orders() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs uppercase tracking-wide">Order ID</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide">Customer</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide">Date</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide">Items</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide">Total</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide">Status</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
+          {/* Desktop Table */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    No orders found.
-                  </TableCell>
+                  <TableHead className="text-xs uppercase tracking-wide">Order ID</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide">Customer</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide">Date</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide">Items</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide">Total</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide">Status</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                filtered.map((order) => {
-                  const next = getNextStatus(order.status);
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.id}</TableCell>
-                      <TableCell>{order.customer}</TableCell>
-                      <TableCell className="text-muted-foreground">{order.date}</TableCell>
-                      <TableCell>{order.items.length}</TableCell>
-                      <TableCell className="font-medium">₹{order.total.toLocaleString("en-IN")}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setSelectedOrder(order)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {next && (
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      No orders found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((order) => {
+                    const next = getNextStatus(order.status);
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.id}</TableCell>
+                        <TableCell>{order.customer}</TableCell>
+                        <TableCell className="text-muted-foreground">{order.date}</TableCell>
+                        <TableCell>{order.items.length}</TableCell>
+                        <TableCell className="font-medium">₹{order.total.toLocaleString("en-IN")}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`text-xs ${getStatusColor(order.status)}`}>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
                             <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs"
-                              onClick={() => updateStatus(order.id, next)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setSelectedOrder(order)}
                             >
-                              → {next}
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                            {next && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => updateStatus(order.id, next)}
+                              >
+                                → {next}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-3">
+            {filtered.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No orders found.</p>
+            ) : (
+              filtered.map((order) => {
+                const next = getNextStatus(order.status);
+                return (
+                  <div
+                    key={order.id}
+                    className="rounded-xl border bg-card p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-sm">{order.id}</p>
+                        <p className="text-xs text-muted-foreground">{order.date}</p>
+                      </div>
+                      <Badge variant="outline" className={`text-xs ${getStatusColor(order.status)}`}>
+                        {order.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{order.customer}</span>
+                      <span className="font-bold">₹{order.total.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {order.items.length} item{order.items.length > 1 ? "s" : ""}
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs flex-1"
+                        onClick={() => setSelectedOrder(order)}
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" /> View
+                      </Button>
+                      {next && (
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs flex-1"
+                          onClick={() => updateStatus(order.id, next)}
+                        >
+                          → {next}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </CardContent>
       </Card>
 
