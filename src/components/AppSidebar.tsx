@@ -1,4 +1,6 @@
-import { LayoutDashboard, Package, Tags, TruckIcon, Store, Sparkles } from "lucide-react";
+import { LayoutDashboard, Package, Tags, TruckIcon, Store, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -23,6 +25,13 @@ const menuItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-none">
@@ -78,21 +87,13 @@ export function AppSidebar() {
       {/* Footer */}
       <SidebarFooter className="p-3">
         <div className="mx-1 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent mb-2" />
-        {!collapsed ? (
-          <div className="flex items-center gap-2 rounded-xl bg-sidebar-accent/50 px-3 py-2.5 animate-fade-in">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[11px] font-semibold text-sidebar-foreground/80">v1.0 Beta</span>
-              <span className="text-[10px] text-sidebar-foreground/40">Kirana Admin</span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-primary/60" />
-          </div>
-        )}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 w-full text-sidebar-foreground/70 transition-all duration-200 hover:text-destructive hover:bg-sidebar-accent"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="text-[13px] font-medium">Logout</span>}
+        </button>
       </SidebarFooter>
     </Sidebar>
   );
