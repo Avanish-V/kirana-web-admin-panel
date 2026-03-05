@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Tags, ShoppingCart, Store, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, Tags, ShoppingCart, Users, Store, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -21,7 +21,7 @@ const menuItems = [
   { title: "Products", url: "/products", icon: Package },
   { title: "Categories", url: "/categories", icon: Tags },
   { title: "Orders", url: "/orders", icon: ShoppingCart },
-  
+  { title: "Customers", url: "/customers", icon: Users },
 ];
 
 export function AppSidebar() {
