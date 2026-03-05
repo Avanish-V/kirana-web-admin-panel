@@ -25,7 +25,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Search, Eye, ShoppingCart, IndianRupee, Clock, CheckCircle2, Loader2, RefreshCcw } from "lucide-react";
+import { Search, Eye, ShoppingCart, IndianRupee, Clock, CheckCircle2, Loader2, RefreshCcw, Wallet, Banknote } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 
