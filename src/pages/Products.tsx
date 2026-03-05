@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, Search, Pencil, Trash2, Package, ImagePlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/api";
+import { uploadImage } from "@/lib/s3";
 
 interface Product {
   id: number;
@@ -23,20 +25,6 @@ interface Product {
   image?: string;
 }
 
-const initialProducts: Product[] = [
-  { id: 1, name: "Tata Salt", category: "Grocery", price: 20, stock: 120, unit: "1kg" },
-  { id: 2, name: "Amul Butter", category: "Dairy", price: 49, stock: 45, unit: "500g" },
-  { id: 3, name: "Aashirvaad Atta", category: "Grocery", price: 290, stock: 30, unit: "5kg" },
-  { id: 4, name: "Fortune Sunflower Oil", category: "Grocery", price: 159, stock: 22, unit: "1L" },
-  { id: 5, name: "Parle-G Biscuits", category: "Snacks", price: 10, stock: 200, unit: "pack" },
-  { id: 6, name: "Amul Milk", category: "Dairy", price: 28, stock: 60, unit: "500ml" },
-  { id: 7, name: "Maggi Noodles", category: "Snacks", price: 14, stock: 150, unit: "pack" },
-  { id: 8, name: "Surf Excel", category: "Household", price: 120, stock: 35, unit: "1kg" },
-  { id: 9, name: "Red Label Tea", category: "Beverages", price: 180, stock: 40, unit: "500g" },
-  { id: 10, name: "Vim Dishwash Bar", category: "Household", price: 10, stock: 80, unit: "piece" },
-];
-
-const categories = ["All", "Grocery", "Dairy", "Snacks", "Household", "Beverages"];
 
 function getStockBadge(stock: number) {
   if (stock <= 10) return <Badge className="bg-destructive/15 text-destructive border-0 text-xs">Low</Badge>;
@@ -47,15 +35,53 @@ function getStockBadge(stock: number) {
 const emptyProduct = { name: "", category: "Grocery", price: 0, stock: 0, unit: "", image: "" };
 
 export default function Products() {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyProduct);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const categories = ["All", ...dbCategories.map(c => c.name)];
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      const [productsData, categoriesData] = await Promise.all([
+        api.get("/products"),
+        api.get("/categories")
+      ]);
+      setProducts(productsData);
+      setDbCategories(categoriesData);
+      if (categoriesData.length > 0) {
+        setForm(prev => ({ ...prev, category: categoriesData[0].name }));
+      }
+    } catch (error: any) {
+      toast({ title: "Failed to fetch data", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const data = await api.get("/products");
+      setProducts(data);
+    } catch (error: any) {
+      toast({ title: "Failed to fetch products", description: error.message, variant: "destructive" });
+    }
+  };
 
   const filtered = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
@@ -66,19 +92,19 @@ export default function Products() {
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      setForm((prev) => ({ ...prev, image: result }));
+      setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
   }
 
   function openAdd() {
     setEditingProduct(null);
-    setForm(emptyProduct);
+    setForm({ ...emptyProduct, category: dbCategories[0]?.name || "Grocery" });
     setImagePreview(null);
+    setSelectedFile(null);
     setDialogOpen(true);
   }
 
@@ -86,28 +112,51 @@ export default function Products() {
     setEditingProduct(product);
     setForm({ name: product.name, category: product.category, price: product.price, stock: product.stock, unit: product.unit, image: product.image || "" });
     setImagePreview(product.image || null);
+    setSelectedFile(null);
     setDialogOpen(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.name || !form.unit || form.price <= 0) {
       toast({ title: "Please fill all fields correctly", variant: "destructive" });
       return;
     }
-    if (editingProduct) {
-      setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? { ...p, ...form } : p)));
-      toast({ title: "Product updated" });
-    } else {
-      const newId = Math.max(...products.map((p) => p.id)) + 1;
-      setProducts((prev) => [...prev, { id: newId, ...form }]);
-      toast({ title: "Product added" });
+
+    try {
+      setUploading(true);
+      let imageUrl = form.image;
+
+      if (selectedFile) {
+        imageUrl = await uploadImage(selectedFile, "products");
+      }
+
+      const productData = { ...form, image: imageUrl };
+
+      if (editingProduct) {
+        await api.put(`/products/${editingProduct.id}`, productData);
+        toast({ title: "Product updated" });
+      } else {
+        await api.post("/products", productData);
+        toast({ title: "Product added" });
+      }
+      fetchProducts();
+      setDialogOpen(false);
+    } catch (error: any) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
-    setDialogOpen(false);
   }
 
-  function handleDelete(id: number) {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    toast({ title: "Product deleted" });
+  async function handleDelete(id: number) {
+    if (!confirm("Are you sure?")) return;
+    try {
+      await api.delete(`/products/${id}`);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      toast({ title: "Product deleted" });
+    } catch (error: any) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    }
   }
 
   return (
@@ -157,37 +206,40 @@ export default function Products() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((product) => (
-                  <tr key={product.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        {product.image ? (
-                          <img src={product.image} alt={product.name} className="h-9 w-9 rounded-lg object-cover" />
-                        ) : (
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                            <Package className="h-4 w-4 text-primary" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                          <p className="text-xs text-muted-foreground">{product.unit}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4"><Badge variant="secondary" className="text-xs font-normal">{product.category}</Badge></td>
-                    <td className="py-3 px-4 font-medium">₹{product.price}</td>
-                    <td className="py-3 px-4">{product.stock}</td>
-                    <td className="py-3 px-4">{getStockBadge(product.stock)}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(product)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(product.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
+                {loading ? (
+                  <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">Loading products...</td></tr>
+                ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">No products found</td></tr>
+                ) : (
+                  filtered.map((product) => (
+                    <tr key={product.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          {product.image ? (
+                            <img src={product.image} alt={product.name} className="h-9 w-9 rounded-lg object-cover" />
+                          ) : (
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                              <Package className="h-4 w-4 text-primary" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-xs text-muted-foreground">{product.unit}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4"><Badge variant="secondary" className="text-xs font-normal">{product.category}</Badge></td>
+                      <td className="py-3 px-4 font-medium">₹{product.price}</td>
+                      <td className="py-3 px-4">{product.stock}</td>
+                      <td className="py-3 px-4">{getStockBadge(product.stock)}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(product)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(product.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -256,8 +308,10 @@ export default function Products() {
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={handleSave}>{editingProduct ? "Update" : "Add Product"}</Button>
+            <DialogClose asChild><Button variant="outline" disabled={uploading}>Cancel</Button></DialogClose>
+            <Button onClick={handleSave} disabled={uploading}>
+              {uploading ? "Uploading..." : (editingProduct ? "Update" : "Add Product")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

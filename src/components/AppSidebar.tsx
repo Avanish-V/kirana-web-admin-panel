@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Tags, TruckIcon, Store, Sparkles } from "lucide-react";
+import { LayoutDashboard, Package, Tags, TruckIcon, Store, Sparkles, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -12,6 +12,8 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -23,6 +25,7 @@ const menuItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const navigate = useNavigate();
 
   return (
     <Sidebar collapsible="icon" className="border-none">
@@ -78,7 +81,8 @@ export function AppSidebar() {
       {/* Footer */}
       <SidebarFooter className="p-3">
         <div className="mx-1 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent mb-2" />
-        {!collapsed ? (
+
+        {!collapsed && (
           <div className="flex items-center gap-2 rounded-xl bg-sidebar-accent/50 px-3 py-2.5 animate-fade-in">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20">
               <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -88,8 +92,9 @@ export function AppSidebar() {
               <span className="text-[10px] text-sidebar-foreground/40">Kirana Admin</span>
             </div>
           </div>
-        ) : (
-          <div className="flex items-center justify-center">
+        )}
+        {collapsed && (
+          <div className="flex flex-col items-center justify-center gap-4">
             <Sparkles className="h-4 w-4 text-primary/60" />
           </div>
         )}

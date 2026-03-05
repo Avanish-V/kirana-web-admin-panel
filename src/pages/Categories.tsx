@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, Pencil, Trash2, Tags, ImagePlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/api";
+import { uploadImage } from "@/lib/s3";
 
 interface Category {
   id: number;
@@ -16,32 +18,41 @@ interface Category {
   image?: string;
 }
 
-const initialCategories: Category[] = [
-  { id: 1, name: "Grocery", productCount: 4 },
-  { id: 2, name: "Dairy", productCount: 2 },
-  { id: 3, name: "Snacks", productCount: 2 },
-  { id: 4, name: "Household", productCount: 2 },
-  { id: 5, name: "Beverages", productCount: 1 },
-];
-
 export default function Categories() {
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [name, setName] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageData, setImageData] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const data = await api.get("/categories");
+      setCategories(data);
+    } catch (error: any) {
+      toast({ title: "Failed to fetch categories", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      setImageData(result);
+      setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
   }
@@ -50,7 +61,7 @@ export default function Categories() {
     setEditing(null);
     setName("");
     setImagePreview(null);
-    setImageData("");
+    setSelectedFile(null);
     setDialogOpen(true);
   }
 
@@ -58,29 +69,51 @@ export default function Categories() {
     setEditing(cat);
     setName(cat.name);
     setImagePreview(cat.image || null);
-    setImageData(cat.image || "");
+    setSelectedFile(null);
     setDialogOpen(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim()) {
       toast({ title: "Name is required", variant: "destructive" });
       return;
     }
-    if (editing) {
-      setCategories((prev) => prev.map((c) => (c.id === editing.id ? { ...c, name, image: imageData || c.image } : c)));
-      toast({ title: "Category updated" });
-    } else {
-      const newId = Math.max(...categories.map((c) => c.id)) + 1;
-      setCategories((prev) => [...prev, { id: newId, name, productCount: 0, image: imageData }]);
-      toast({ title: "Category added" });
+
+    try {
+      setUploading(true);
+      let imageUrl = editing?.image || "";
+
+      if (selectedFile) {
+        imageUrl = await uploadImage(selectedFile, "categories");
+      }
+
+      const categoryData = { name, image: imageUrl };
+
+      if (editing) {
+        await api.put(`/categories/${editing.id}`, categoryData);
+        toast({ title: "Category updated" });
+      } else {
+        await api.post("/categories", categoryData);
+        toast({ title: "Category added" });
+      }
+      fetchCategories();
+      setDialogOpen(false);
+    } catch (error: any) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
-    setDialogOpen(false);
   }
 
-  function handleDelete(id: number) {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-    toast({ title: "Category deleted" });
+  async function handleDelete(id: number) {
+    if (!confirm("Are you sure?")) return;
+    try {
+      await api.delete(`/categories/${id}`);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      toast({ title: "Category deleted" });
+    } catch (error: any) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    }
   }
 
   return (
@@ -97,29 +130,35 @@ export default function Categories() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {categories.map((cat) => (
-          <Card key={cat.id} className="border-0 shadow-sm">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {cat.image ? (
-                  <img src={cat.image} alt={cat.name} className="h-10 w-10 rounded-xl object-cover" />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                    <Tags className="h-5 w-5 text-primary" />
+        {loading ? (
+          <p className="col-span-full py-12 text-center text-muted-foreground">Loading categories...</p>
+        ) : categories.length === 0 ? (
+          <p className="col-span-full py-12 text-center text-muted-foreground">No categories found</p>
+        ) : (
+          categories.map((cat) => (
+            <Card key={cat.id} className="border-0 shadow-sm">
+              <CardContent className="p-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {cat.image ? (
+                    <img src={cat.image} alt={cat.name} className="h-10 w-10 rounded-xl object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                      <Tags className="h-5 w-5 text-primary" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-semibold">{cat.name}</p>
+                    <p className="text-xs text-muted-foreground">{cat.productCount} products</p>
                   </div>
-                )}
-                <div>
-                  <p className="font-semibold">{cat.name}</p>
-                  <p className="text-xs text-muted-foreground">{cat.productCount} products</p>
                 </div>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(cat)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(cat.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(cat)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(cat.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -157,8 +196,10 @@ export default function Categories() {
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={handleSave}>{editing ? "Update" : "Add"}</Button>
+            <DialogClose asChild><Button variant="outline" disabled={uploading}>Cancel</Button></DialogClose>
+            <Button onClick={handleSave} disabled={uploading}>
+              {uploading ? "Uploading..." : (editing ? "Update" : "Add")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

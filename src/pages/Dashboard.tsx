@@ -1,7 +1,7 @@
-import { IndianRupee, ShoppingCart, Clock, TrendingUp, Package, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { IndianRupee, ShoppingCart, Clock, TrendingUp, Package, ArrowUpRight, ArrowDownRight, ShieldCheck, ShieldAlert, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
+import { useEffect, useState } from "react";
 const stats = [
   {
     title: "Today's Sales",
