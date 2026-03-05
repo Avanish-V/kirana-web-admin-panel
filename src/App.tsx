@@ -11,6 +11,7 @@ import Categories from "./pages/Categories";
 
 import Orders from "./pages/Orders";
 import Login from "./pages/Login";
+import Customers from "./pages/Customers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const AppRoutes = () => (
               <Route path="/categories" element={<Categories />} />
               <Route path="/orders" element={<Orders />} />
               
+              <Route path="/customers" element={<Customers />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminLayout>
